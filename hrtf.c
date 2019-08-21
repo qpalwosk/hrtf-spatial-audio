@@ -13,6 +13,11 @@
 
 #include "hrtf.h"
 
+// HRTF data for each point on the horizontal plane (0 ... 180)
+#define AZIMUTH_CNT 37
+#define AZIMUTH_INCREMENT_DEGREES 5
+hrtf_data hrtfs[AZIMUTH_CNT];
+
 const char HRTF_FILE_FORMAT_MIT[] = "mit/elev%d/H%de%03da.wav";
 const char AUDIO_FILE[] = "./beep.wav";
 
@@ -41,13 +46,6 @@ kiss_fft_cpx* audio_kiss_freq_l; // Audio sample multiplied by HRTF, left ear
 kiss_fft_cpx* audio_kiss_freq_r; // Audio sample multiplied by HRTF, right ear
 kiss_fft_cpx* audio_kiss_time_l; // Final, convolved audio sample, left ear
 kiss_fft_cpx* audio_kiss_time_r; // Final, convolved audio sample, right ear
-
-
-// HRTF data for each point on the horizontal plane (0 ... 180)
-const int AZIMUTH_CNT = 37;
-const int AZIMUTH_INCREMENT_DEGREES = 5;
-hrtf_data hrtfs[AZIMUTH_CNT];
-
 
 // buf_len should be the number of data point in the stereo `buf`
 // Each sample should have 2 data points; 1 for each ear
@@ -113,7 +111,7 @@ void fill_audio(void* udata, Uint8* stream, int len) {
     // Because the HRIR recordings are only from 0-180, we swap them when > 180
     if (azimuth > 180) {
         swap = true;
-        azimuth_idx = 35 - (azimuth_idx % 37);
+        azimuth_idx = 35 - (azimuth_idx % AZIMUTH_CNT);
     }
 
     hrtf_data* data = &hrtfs[azimuth_idx];
@@ -251,7 +249,6 @@ int main(int argc, char* argv[]) {
     SDL_AudioSpec* file_audio_spec;
     Uint8* audio_buf;
     Uint32 audio_len;
-    Uint8* audio_pos;
 
 
     // Open audio file
@@ -260,7 +257,6 @@ int main(int argc, char* argv[]) {
         printf("Failed to allocate audio spec for wav file");
         return 1;
     }
-
     if (!SDL_LoadWAV(AUDIO_FILE, file_audio_spec, &audio_buf, &audio_len)) {
         printf("Could not load audio file: %s", AUDIO_FILE);
         SDL_Quit();
@@ -285,7 +281,6 @@ int main(int argc, char* argv[]) {
 
     free(audio_buf);
     audio_buf = audio_cvt.buf;
-    audio_pos = audio_buf;
     audio_len = audio_cvt.len_cvt;
 
     cfg_forward = kiss_fft_alloc(NUM_SAMPLES_PER_FILL, 0, NULL, NULL);
@@ -313,13 +308,13 @@ int main(int argc, char* argv[]) {
     memset(audio_kiss_time_l, 0, FFT_SIZE);
     memset(audio_kiss_time_r, 0, FFT_SIZE);
 
-    for (int i = 0; (i * SAMPLE_SIZE) < audio_len; i++) {
+    for (int i = 0; (i * SAMPLE_SIZE) < 51200/*audio_len*/; i++) {
         int idx = i;
         audio_kiss_buf[idx].r = ((float*)audio_buf)[i];
         audio_kiss_buf[idx].i = 0;
     }
 
-    for (int azimuth = 0; azimuth < 37; azimuth++) {
+    for (int azimuth = 0; azimuth < AZIMUTH_CNT; azimuth++) {
         char filename[100];
         sprintf(filename, HRTF_FILE_FORMAT_MIT, 0, 0, azimuth * 5);
         printf("Loading: %s\n", filename);
@@ -348,7 +343,6 @@ int main(int argc, char* argv[]) {
 
         free(hrtf_buf);
     }
-
 
     SDL_Event event;
     Uint32 time = SDL_GetTicks();

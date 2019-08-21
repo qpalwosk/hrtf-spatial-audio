@@ -1,3 +1,10 @@
+# Build
+
+fatal error: SDL2/SDL.h: No such file or directory
+```
+sudo apt-get install libsdl2-dev
+```
+
 # HRTF Spatialized Audio
 
 This project was created for educational purposes to learn more about
